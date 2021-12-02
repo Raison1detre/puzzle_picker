@@ -12,6 +12,7 @@ W = 1200
 H = 900
 CHANNEL_NUM = 3  # we work with rgb images
 MAX_VALUE = 255
+PATH = "C:\\Users\\alex\\my-py\\tiles" # path to the folder of tiles (not folder of folders of tiles!)
 
 arr_of_likeness=[]
 arr_of_map1=[]
@@ -50,7 +51,7 @@ def smooth(I):
 def get_all_indexes(list_, element):
     return [index for index, value in enumerate(list_) if value == element]
 
-tiles = [read_image(os.path.join("tiles", t)) for t in sorted(os.listdir("tiles"))]
+tiles = [read_image(os.path.join(PATH, t)) for t in sorted(os.listdir(PATH))]
 dims = np.array([t.shape[:2] for t in tiles])
 h, w = np.min(dims, axis=0)
 x_nodes = np.arange(0, W, w)
