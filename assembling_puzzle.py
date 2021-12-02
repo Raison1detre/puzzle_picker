@@ -20,6 +20,23 @@ list_of_white_side = []
 list_of_side = []
 list_of_number_side1=[]
 list_of_number_side2=[]
+list_of_tiles=[]
+
+class Tiles():
+    side_1 = None
+    side_2 = None
+    side_3 = None
+    side_4 = None
+    side_matching_to_the_side_1 = None
+    side_matching_to_the_side_2 = None
+    side_matching_to_the_side_3 = None
+    side_matching_to_the_side_4 = None
+    number_of_rotate = 0
+
+    def __init__(self, body, number):
+        self.body = body
+        self.number = number
+
 
 
 def write_image(path, img):
@@ -52,6 +69,11 @@ def get_all_indexes(list_, element):
     return [index for index, value in enumerate(list_) if value == element]
 
 tiles = [read_image(os.path.join(PATH, t)) for t in sorted(os.listdir(PATH))]
+
+for t in sorted(os.listdir(PATH)):
+    tile = Tiles(read_image(os.path.join(PATH, t)),t)
+    list_of_tiles.append(tile)
+
 dims = np.array([t.shape[:2] for t in tiles])
 h, w = np.min(dims, axis=0)
 x_nodes = np.arange(0, W, w)
