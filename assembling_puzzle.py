@@ -22,23 +22,6 @@ list_of_number_side1=[]
 list_of_number_side2=[]
 list_of_tiles=[]
 
-class Tiles():
-    side_1 = None
-    side_2 = None
-    side_3 = None
-    side_4 = None
-    side_matching_to_the_side_1 = None
-    side_matching_to_the_side_2 = None
-    side_matching_to_the_side_3 = None
-    side_matching_to_the_side_4 = None
-    number_of_rotate = 0
-
-    def __init__(self, body, number):
-        self.body = body
-        self.number = number
-
-
-
 def write_image(path, img):
     h, w = img.shape[:2]
     # ppm format requires header in special format
@@ -56,10 +39,8 @@ def read_image(path):
     image = np.loadtxt(path, skiprows=3, dtype=np.uint8).reshape((h, w, CHANNEL_NUM))
     return image
 
-def smooth(I):
-    
+def smooth(I): 
     J = I.copy()
-    
     J[1:-1] = (J[1:-1] // 2 + J[:-2] // 4 + J[2:] // 4)
     J[:, 1:-1] = (J[:, 1:-1] // 2 + J[:, :-2] // 4 + J[:, 2:] // 4)
     
@@ -70,9 +51,6 @@ def get_all_indexes(list_, element):
 
 tiles = [read_image(os.path.join(PATH, t)) for t in sorted(os.listdir(PATH))]
 
-for t in sorted(os.listdir(PATH)):
-    tile = Tiles(read_image(os.path.join(PATH, t)),t)
-    list_of_tiles.append(tile)
 
 dims = np.array([t.shape[:2] for t in tiles])
 h, w = np.min(dims, axis=0)
@@ -95,23 +73,9 @@ for tile in range(len(tiles1)):
                     list_of_number_side1.append([tile,rot_t1])
                     list_of_number_side2.append([tile2,rot_t2])
 
-
-t1=np.rot90(tiles1[9],0)
-t2=np.rot90(tiles1[10],0)
-t1_slice =np.array(t1[:,0,0],dtype=np.int16)
-t2_slice =np.array(t2[:,299,0],dtype=np.int16)
-#print(np.mean(np.abs(t1_slice-t2_slice)))
-
-#print(tiles[0][:,299,0])
-#print(shape(tiles[0]))
-#print(len(list_of_side))
-#print(list_of_number_side1)
 cur_match_side = []
 side_for_cur_match_1 = []
 side_for_cur_match_2 = []
-
-#print(min(arr_of_likeness))
-
 
 for i in range(len(tiles)):
     for j in range(4):
@@ -121,18 +85,13 @@ for i in range(len(tiles)):
         s=[]
         for k in index_all:
             s.append(arr_of_likeness[k])
-
-        
-        #mn,mx = min(index),max(index)
-        
+       
         cur=arr_of_likeness.index(min(s))
         side_for_cur_match_1.append(list_of_number_side1[cur])
         side_for_cur_match_2.append(list_of_number_side2[cur])
         cur_match_side.append(arr_of_likeness[cur])
 
 
-#print(cur_match_side)
-#print('')
 def find_four_pair(numb_tile):
     pair = []
     contact = []
@@ -147,7 +106,6 @@ def find_four_pair(numb_tile):
             contact.append(side_for_cur_match_1[i2][0])
     return (pair,contact)
 
-
 all_pair=[]
 all_contact=[]
 
@@ -155,7 +113,7 @@ for i in range(len(tiles)):
     p,c = find_four_pair(i)
     all_pair.append(p)
     all_contact.append(c)
-#print(all_pair)
+
 match1 = []
 match2 = []
 for til in range(len(tiles)):
@@ -174,6 +132,5 @@ for i in range(len(match1)):
     t2_rot=np.rot90(t2,match2[i][1])
     t_stack = np.hstack((t1_rot,t2_rot))
     write_image(f"image_test{i}.ppm",t_stack)
-
 
  
