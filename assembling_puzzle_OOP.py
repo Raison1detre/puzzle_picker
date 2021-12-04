@@ -14,6 +14,7 @@ CHANNEL_NUM = 3  # we work with rgb images
 MAX_VALUE = 255
 PATH = "C:\\Users\\alex\\my-py\\tiles" # path to the folder of tiles (not folder of folders of tiles!)
 NUMBER_OF_SMOOTHING = 5 
+SIMILARITY_COEFFICIENT = 17
 
 list_of_tiles = []
 
@@ -64,28 +65,48 @@ class Tile():
         sb = np.rot90(sb,1)
         self.sides[4] = np.array(sb[:,h-1,0], dtype=np.int16)
         sb = np.rot90(sb,1)
-
     
-def check_similarity(side1,side2):
-    similarity = []
-    for s1 in side1.sides:
-        for s2 in side2.sides:
-            s_1 = side1.sides[s1]
-            s_2 = side2.sides[s2]
+def check_similarity(tile1,tile2):
+    similarity = np.zeros((3,16))
+    count = 0
+    for s1 in tile1.sides:
+        for s2 in tile2.sides:
+            s_1 = tile1.sides[s1]
+            s_2 = tile2.sides[s2]
             s_2 = s_2[::-1]
             sim = s_1 - s_2
-            similarity.append(np.std(sim))
-    print(min(similarity))
+            similarity[0,count]=np.std(sim)
+            similarity[1,count]=s1
+            similarity[2,count]=s2
+            count +=1
+    i,j = np.where(similarity == min(similarity[0,:]))
+    answer = similarity[:,j].flatten()
+    return answer
+
+def print_image():
+    for i in range(len(list_of_tiles)):
+        til = list_of_tiles[i]
+        til.write_image(f"image_test{i}.ppm")
 
 
-for t in sorted(os.listdir(PATH)):
-    tile = Tile(read_image(os.path.join(PATH, t)),t)
-    tile.smooth(NUMBER_OF_SMOOTHING)
-    tile.sliser()
-    list_of_tiles.append(tile)
-    
-for i in range(len(list_of_tiles)):
-    til = list_of_tiles[i]
-    til.write_image(f"image_test{i}.ppm")
+def solve():
+    list_of_similarity = []
+    for t in sorted(os.listdir(PATH)):
+        tile = Tile(read_image(os.path.join(PATH, t)),t)
+        tile.smooth(NUMBER_OF_SMOOTHING)
+        tile.sliser()
+        list_of_tiles.append(tile)
+        
+    for i in range(len(list_of_tiles)):
+        list_of_check = []
+        for j in range(len(list_of_tiles)):
+            if i != j:
+                list_of_check.append(check_similarity(list_of_tiles[i],list_of_tiles[j]))
+        print(list_of_check)
 
-check_similarity(list_of_tiles[0],list_of_tiles[3])
+    #print_image()
+
+    check_similarity(list_of_tiles[0], list_of_tiles[3])
+
+if __name__ == "__main__":
+    solve()
