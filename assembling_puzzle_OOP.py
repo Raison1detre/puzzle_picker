@@ -26,12 +26,10 @@ def read_image(path):
     return image
 
 class Tile():
-    smooth_body = None
-    number_of_rotate = 0
-
-
     def __init__(self, body, number):
         self.body = body
+        self.smooth_body = None
+        self.number_of_rotate = 0
         self.number = number
         self.sides = {1:None, 2:None, 3:None, 4:None}
         self.sides_matching_to_the_sides = {1:None, 2:None, 3:None, 4:None}
@@ -65,20 +63,38 @@ class Tile():
         sb = np.rot90(sb,1)
         self.sides[4] = np.array(sb[:,h-1,0], dtype=np.int16)
         sb = np.rot90(sb,1)
-    
-def check_similarity(tile1,tile2):
-    similarity = np.zeros((3,16))
+
+
+def fill_sides_matching_to_the_sides(list_of_tiles):
+    for tile in list_of_tiles:
+        for side in tile.sides_matching_to_the_sides:
+            if tile.sides_matching_to_the_sides[side] == None:
+                tile_match = find_similar_tile(tile,side,list_of_tiles)
+                tile.sides_matching_to_the_sides[side] = (tile_match[0][1],tile_match[0][2])
+                #print(tile_match)
+
+def find_similar_tile(tile1, side_tile_1, list_of_tiles):
+    similar_tiles = []
+    for tile in list_of_tiles:
+        if tile != tile1:
+            similar_tiles.append(check_similarity(tile1,side_tile_1,tile))
+    similar_tiles = np.array(similar_tiles)
+    i,j = np.where(similar_tiles == min(similar_tiles[:,0]))
+    return similar_tiles[i,:]
+
+
+def check_similarity(tile1, side_tile_1, tile2):
+    similarity = np.zeros((3,4))
     count = 0
-    for s1 in tile1.sides:
-        for s2 in tile2.sides:
-            s_1 = tile1.sides[s1]
-            s_2 = tile2.sides[s2]
-            s_2 = s_2[::-1]
-            sim = s_1 - s_2
-            similarity[0,count]=np.std(sim)
-            similarity[1,count]=s1
-            similarity[2,count]=s2
-            count +=1
+    for s2 in tile2.sides:
+        s_1 = tile1.sides[side_tile_1]
+        s_2 = tile2.sides[s2]
+        s_2 = s_2[::-1]
+        sim = s_1 - s_2
+        similarity[0,count]=np.std(sim)
+        similarity[1,count]=tile2.number
+        similarity[2,count]=s2
+        count +=1
     i,j = np.where(similarity == min(similarity[0,:]))
     answer = similarity[:,j].flatten()
     return answer
@@ -92,21 +108,16 @@ def print_image():
 def solve():
     list_of_similarity = []
     for t in sorted(os.listdir(PATH)):
-        tile = Tile(read_image(os.path.join(PATH, t)),t)
+        tile = Tile(read_image(os.path.join(PATH, t)),int(t[0:4]))
         tile.smooth(NUMBER_OF_SMOOTHING)
         tile.sliser()
         list_of_tiles.append(tile)
         
-    for i in range(len(list_of_tiles)):
-        list_of_check = []
-        for j in range(len(list_of_tiles)):
-            if i != j:
-                list_of_check.append(check_similarity(list_of_tiles[i],list_of_tiles[j]))
-        print(list_of_check)
-
+    fill_sides_matching_to_the_sides(list_of_tiles)
+    for ti in list_of_tiles:
+        print(ti.sides_matching_to_the_sides)
     #print_image()
 
-    check_similarity(list_of_tiles[0], list_of_tiles[3])
 
 if __name__ == "__main__":
     solve()
