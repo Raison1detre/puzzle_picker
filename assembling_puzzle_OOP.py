@@ -33,6 +33,7 @@ class Tile():
         self.number = number
         self.sides = {1:None, 2:None, 3:None, 4:None}
         self.sides_matching_to_the_sides = {1:None, 2:None, 3:None, 4:None}
+        self.rating_of_match = {1:None, 2:None, 3:None, 4:None}
 
     def smooth(self,number_of_smoothing):
         body = self.body
@@ -66,14 +67,20 @@ class Tile():
 
 
 def fill_sides_matching_to_the_sides(list_of_tiles):
+    """Получает на вход список всех плиток list_of_tiles. Для каждой плитки применяет find_similar_tile(tile,side,list_of_tiles) и по результатам 
+    заполняет self.sides_matching_to_the_sides и self.rating_of_match
+    return =>> None"""
     for tile in list_of_tiles:
         for side in tile.sides_matching_to_the_sides:
             if tile.sides_matching_to_the_sides[side] == None:
                 tile_match = find_similar_tile(tile,side,list_of_tiles)
-                tile.sides_matching_to_the_sides[side] = (tile_match[0][1],tile_match[0][2])
-                #print(tile_match)
-
+                tile.sides_matching_to_the_sides[side] = (int(tile_match[0][1]),int(tile_match[0][2]))
+                tile.rating_of_match[side] = tile_match[0][0]
+                
 def find_similar_tile(tile1, side_tile_1, list_of_tiles):
+    """Получает на вход плитку tile1, номер её стороны side_tile_1, и список всех плиток. Работает в паре с check_similarity(tile1, side_tile_1, tile2).
+    возвращает плитку и номер стороны, которая подходит к tile1, side_tile_1 наилучшим образом.
+    return =>>  np.array [коэфф.соответствия(min), номер плитки(tile2.number), номер стороны плитки(tile2.side)] """
     similar_tiles = []
     for tile in list_of_tiles:
         if tile != tile1:
@@ -84,6 +91,9 @@ def find_similar_tile(tile1, side_tile_1, list_of_tiles):
 
 
 def check_similarity(tile1, side_tile_1, tile2):
+    """Получает на вход плитку tile1 и номер её стороны side_tile_1, которую нужно сравнивает со всеми сторонами плитки tile2.
+    Из 4 сторон выбирает ту с которой коэфф. соответствия меньше и
+    return =>> np.array [коэфф.соответствия(min), номер плитки(tile2.number), номер стороны плитки(tile2.side)]"""
     similarity = np.zeros((3,4))
     count = 0
     for s2 in tile2.sides:
@@ -106,7 +116,6 @@ def print_image():
 
 
 def solve():
-    list_of_similarity = []
     for t in sorted(os.listdir(PATH)):
         tile = Tile(read_image(os.path.join(PATH, t)),int(t[0:4]))
         tile.smooth(NUMBER_OF_SMOOTHING)
@@ -116,6 +125,8 @@ def solve():
     fill_sides_matching_to_the_sides(list_of_tiles)
     for ti in list_of_tiles:
         print(ti.sides_matching_to_the_sides)
+    for ti in list_of_tiles:
+        print(ti.rating_of_match)    
     #print_image()
 
 
