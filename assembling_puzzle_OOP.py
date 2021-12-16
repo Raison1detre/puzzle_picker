@@ -12,7 +12,7 @@ W = 1200
 H = 900
 CHANNEL_NUM = 3  # we work with rgb images
 MAX_VALUE = 255
-PATH = "C:\\Users\\alex\\my-py\\data\\0000_0005_0000\\tiles" # path to the folder of tiles (not folder of folders of tiles!)
+PATH = "C:\\Users\\alex\\my-py\\data\\0000_0000_0000\\tiles" # path to the folder of tiles (not folder of folders of tiles!)
 NUMBER_OF_SMOOTHING = 1 
 
 list_of_tiles = []
@@ -53,7 +53,6 @@ class Tile():
                 f.write(f'{r} {g} {b} ')
     
     def sliser(self):
-        print(1)
         sb = self.smooth_body
         h,w = sb.shape[:2]
         self.sides[1] = np.array(sb[:,w-1,0], dtype=np.int16)
@@ -76,7 +75,7 @@ def fill_sides_matching_to_the_sides(list_of_tiles):
                 tile_match = find_similar_tile(tile,side,list_of_tiles)
                 tile.sides_matching_to_the_sides[side] = (int(tile_match[0][1]),int(tile_match[0][2]))
                 tile.rating_of_match[side] = tile_match[0][0]
-    Tile.number_of_false_connections = (((len(list_of_tiles)/12)**(0,5))*4*2)+(((len(list_of_tiles)/12)**(0,5))*3*2)
+    Tile.number_of_false_connections = (((len(list_of_tiles)/12)**(0.5))*4*2)+(((len(list_of_tiles)/12)**(0.5))*3*2)
                 
 def find_similar_tile(tile1, side_tile_1, list_of_tiles):
     """Получает на вход плитку tile1, номер её стороны side_tile_1, и список всех плиток. Работает в паре с check_similarity(tile1, side_tile_1, tile2).
@@ -127,12 +126,12 @@ def solve():
         list_of_tiles.append(tile)
         
     fill_sides_matching_to_the_sides(list_of_tiles)
-    """
+  
     for ti in list_of_tiles:
         print(ti.sides_matching_to_the_sides)
     for ti in list_of_tiles:
         print(ti.rating_of_match)    
-        """
+
     print(Tile.number_of_false_connections)
     print(len(list_of_tiles))
     #print_image()
