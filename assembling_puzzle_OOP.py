@@ -12,9 +12,8 @@ W = 1200
 H = 900
 CHANNEL_NUM = 3  # we work with rgb images
 MAX_VALUE = 255
-PATH = "C:\\Users\\alex\\my-py\\tiles" # path to the folder of tiles (not folder of folders of tiles!)
-NUMBER_OF_SMOOTHING = 5 
-SIMILARITY_COEFFICIENT = 17
+PATH = "C:\\Users\\alex\\my-py\\data\\0000_0005_0000\\tiles" # path to the folder of tiles (not folder of folders of tiles!)
+NUMBER_OF_SMOOTHING = 1 
 
 list_of_tiles = []
 
@@ -54,6 +53,7 @@ class Tile():
                 f.write(f'{r} {g} {b} ')
     
     def sliser(self):
+        print(1)
         sb = self.smooth_body
         h,w = sb.shape[:2]
         self.sides[1] = np.array(sb[:,w-1,0], dtype=np.int16)
@@ -68,7 +68,7 @@ class Tile():
 
 def fill_sides_matching_to_the_sides(list_of_tiles):
     """Получает на вход список всех плиток list_of_tiles. Для каждой плитки применяет find_similar_tile(tile,side,list_of_tiles) и по результатам 
-    заполняет self.sides_matching_to_the_sides и self.rating_of_match
+    заполняет self.sides_matching_to_the_sides и self.rating_of_match, а также number_of_false_connections
     return =>> None"""
     for tile in list_of_tiles:
         for side in tile.sides_matching_to_the_sides:
@@ -76,6 +76,7 @@ def fill_sides_matching_to_the_sides(list_of_tiles):
                 tile_match = find_similar_tile(tile,side,list_of_tiles)
                 tile.sides_matching_to_the_sides[side] = (int(tile_match[0][1]),int(tile_match[0][2]))
                 tile.rating_of_match[side] = tile_match[0][0]
+    Tile.number_of_false_connections = (((len(list_of_tiles)/12)**(0,5))*4*2)+(((len(list_of_tiles)/12)**(0,5))*3*2)
                 
 def find_similar_tile(tile1, side_tile_1, list_of_tiles):
     """Получает на вход плитку tile1, номер её стороны side_tile_1, и список всех плиток. Работает в паре с check_similarity(tile1, side_tile_1, tile2).
@@ -85,8 +86,9 @@ def find_similar_tile(tile1, side_tile_1, list_of_tiles):
     for tile in list_of_tiles:
         if tile != tile1:
             similar_tiles.append(check_similarity(tile1,side_tile_1,tile))
-    similar_tiles = np.array(similar_tiles)
+    similar_tiles = np.asarray(similar_tiles)
     i,j = np.where(similar_tiles == min(similar_tiles[:,0]))
+    j
     return similar_tiles[i,:]
 
 
@@ -101,11 +103,13 @@ def check_similarity(tile1, side_tile_1, tile2):
         s_2 = tile2.sides[s2]
         s_2 = s_2[::-1]
         sim = s_1 - s_2
-        similarity[0,count]=np.std(sim)
+        similarity[0,count]=np.abs(np.mean(sim))
         similarity[1,count]=tile2.number
         similarity[2,count]=s2
         count +=1
     i,j = np.where(similarity == min(similarity[0,:]))
+    if len(j) !=1:      #я без понятия почему, но np.where(similarity == s_min) иногда выдает больше одного ответа. И если не отсекать лишние появляется ошибка. 
+        j = j[0]
     answer = similarity[:,j].flatten()
     return answer
 
@@ -123,14 +127,14 @@ def solve():
         list_of_tiles.append(tile)
         
     fill_sides_matching_to_the_sides(list_of_tiles)
+    """
     for ti in list_of_tiles:
         print(ti.sides_matching_to_the_sides)
-    count = 0
     for ti in list_of_tiles:
-        for key in ti.rating_of_match:
-            if ti.rating_of_match[key] != None:
-                count +=1
         print(ti.rating_of_match)    
+        """
+    print(Tile.number_of_false_connections)
+    print(len(list_of_tiles))
     #print_image()
 
 
