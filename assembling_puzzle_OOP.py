@@ -119,6 +119,16 @@ class Assembler():
             j = j[0]
         answer = similarity[:,j].flatten()
         return answer
+    
+    def verification(self, tile1, tile2, side_t1, side_t2, list_of_tiles):
+        ver_side_t1 = 4 if side_t1==1 else side_t1-1
+        ver_side_t2 = 1 if side_t2==4 else side_t2+1
+        v1 = self.find_similar_tile(tile1,ver_side_t1,list_of_tiles)
+        v2 = self.find_similar_tile(tile2,ver_side_t2,list_of_tiles)
+        if v1[0][1]==v2[0][1]:
+            return (v1,v2)
+        else:
+            return False
 
 def print_image():
     for i in range(len(list_of_tiles)):
@@ -133,8 +143,9 @@ def solve():
         tile.sliser()
         list_of_tiles.append(tile)
     assembler = Assembler(list_of_tiles)
-    assembler.fill_sides_matching_to_the_sides(list_of_tiles)
-    
+    #assembler.fill_sides_matching_to_the_sides(list_of_tiles)
+
+    """ 
     for ti in list_of_tiles:
         print(ti.sides_matching_to_the_sides)
     count = 0
@@ -143,11 +154,24 @@ def solve():
             if ti.rating_of_match[key] != None:
                 count +=1
         print(ti.rating_of_match)    
-        
+    """
+
+    example_tile = list_of_tiles[0]
+    pair1 = assembler.find_similar_tile(example_tile,int(4),list_of_tiles)
+    pair2 = assembler.find_similar_tile(example_tile,int(1),list_of_tiles)
+    side_pair1 = pair1[0][2]
+    side_pair2 = pair2[0][2]
+    print(pair1)
+    print(pair2)
+    result = assembler.verification(list_of_tiles[int(pair1[0][1])], list_of_tiles[int(pair2[0][1])], side_pair1, side_pair2, list_of_tiles)
+    
+    print(result)
+
+    """
     print(Tile.number_of_false_connections)
     print(len(list_of_tiles))
     print(count)
-    
+    """
     #print_image()
 
 
