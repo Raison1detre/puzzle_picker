@@ -34,6 +34,7 @@ class Tile():
         self.sides = {1:None, 2:None, 3:None, 4:None}
         self.sides_matching_to_the_sides = {1:None, 2:None, 3:None, 4:None}
         self.rating_of_match = {1:None, 2:None, 3:None, 4:None}
+        self.flag = False #положение флага означает была ли повернута плитка относительно начального положения
 
     def smooth(self,number_of_smoothing):
         body = self.body
@@ -96,7 +97,7 @@ class Assembler():
         similar_tiles = np.asarray(similar_tiles)
         i,j = np.where(similar_tiles == min(similar_tiles[:,0]))
         j
-        return similar_tiles[i,:]
+        return similar_tiles[i,:].flatten()
 
 
     def check_similarity(self, tile1, side_tile_1, tile2):
@@ -120,15 +121,40 @@ class Assembler():
         answer = similarity[:,j].flatten()
         return answer
     
-    def verification(self, tile1, tile2, side_t1, side_t2, list_of_tiles):
+    def verification(self, tile1, tile2, side_t1, side_t2, list_of_tiles): # FIXME упростить вывод функции, проверить её работоспособность написать комментарий
+        """Функция используется для проверки найденных связей. Получает на вход две плитки tile1 и tile2 которые связаны с некоторой третьей плиткой, и проверяет,
+        связаны ли эти плитки с еще одной общей. side_t1, side_t2 это стороны плитки с которыми связаны tile1, tile2 соответственно. list_of_tiles список хранящий все плитки.
+        возвращает
+        return =>> tuple(np.array[коэфф.соответствия(min), номер плитки(tile.number), номер стороны плитки(tile.side)],номер плитки(tile.number), 
+        np.array[коэфф.соответствия(min), номер плитки(tile.number), номер стороны плитки(tile.side)],номер плитки(tile.number))"""
         ver_side_t1 = 4 if side_t1==1 else side_t1-1
         ver_side_t2 = 1 if side_t2==4 else side_t2+1
         v1 = self.find_similar_tile(tile1,ver_side_t1,list_of_tiles)
         v2 = self.find_similar_tile(tile2,ver_side_t2,list_of_tiles)
-        if v1[0][1]==v2[0][1]:
-            return (v1,v2)
+        if v1[1]==v2[1]:
+            return (v1, ver_side_t1, v2, ver_side_t2)
         else:
             return False
+    
+    def rotate(self, tile, number_of_rotate): # FIXME проверить работоспособность функции и написать комментарий
+        tile.body = np.rot90(tile.body, number_of_rotate)
+        tile.smooth_body = np.rot90(tile.smooth_body,number_of_rotate)
+        tile.flag = True
+
+    def rotate_tile(self, tile, side, location): # FIXME проверить работоспособность функции и написать комментарий
+        if location == 1:
+            self.rotate(tile,location+side)
+        elif location == 2:
+            self.rotate(tile, side)
+        elif location == 3:
+            self.rotate(tile,location+side)
+        elif location == 4:
+            self.rotate(tile, side+2)
+        else:
+            print('ERROR')
+
+
+    #def assemble(self, tile1, tile2,)
 
 def print_image():
     for i in range(len(list_of_tiles)):
@@ -159,12 +185,15 @@ def solve():
     example_tile = list_of_tiles[0]
     pair1 = assembler.find_similar_tile(example_tile,int(4),list_of_tiles)
     pair2 = assembler.find_similar_tile(example_tile,int(1),list_of_tiles)
-    side_pair1 = pair1[0][2]
-    side_pair2 = pair2[0][2]
+    side_pair1 = pair1[2]
+    side_pair2 = pair2[2]
     print(pair1)
     print(pair2)
-    result = assembler.verification(list_of_tiles[int(pair1[0][1])], list_of_tiles[int(pair2[0][1])], side_pair1, side_pair2, list_of_tiles)
-    
+    result = assembler.verification(list_of_tiles[int(pair1[1])], list_of_tiles[int(pair2[1])], side_pair1, side_pair2, list_of_tiles)
+    example_tile_3 = list_of_tiles[int(result[0][1])]
+
+
+
     print(result)
 
     """
