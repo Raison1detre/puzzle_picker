@@ -44,8 +44,8 @@ class Tile():
             J[:, 1:-1] = (J[:, 1:-1] // 2 + J[:, :-2] // 4 + J[:, 2:] // 4)
         self.smooth_body = J
 
-    def write_image(self, path):
-        img = self.body
+    def write_image(self, img, path):
+        img = img
         h, w = img.shape[:2]
         # ppm format requires header in special format
         header = f'P3\n{w} {h}\n{MAX_VALUE}\n'
@@ -73,18 +73,6 @@ class Assembler():
         x_nodes = np.arange(0, W, w)
         y_nodes = np.arange(0, H, h)
         self.matrix_of_ansvers = np.zeros((len(y_nodes),len(x_nodes),2), dtype=np.uint8)
-
-    def fill_sides_matching_to_the_sides(self, list_of_tiles):
-        """Получает на вход список всех плиток list_of_tiles. Для каждой плитки применяет find_similar_tile(tile,side,list_of_tiles) и по результатам 
-        заполняет self.sides_matching_to_the_sides и self.rating_of_match, а также number_of_false_connections
-        return =>> None"""
-        for tile in list_of_tiles:
-            for side in tile.sides_matching_to_the_sides:
-                if tile.sides_matching_to_the_sides[side] == None:
-                    tile_match = self.find_similar_tile(tile,side,list_of_tiles)
-                    tile.sides_matching_to_the_sides[side] = (int(tile_match[0][1]),int(tile_match[0][2]))
-                    tile.rating_of_match[side] = tile_match[0][0]
-        Tile.number_of_false_connections = (((len(list_of_tiles)/12)**(0.5))*4*2)+(((len(list_of_tiles)/12)**(0.5))*3*2)
                 
     def find_similar_tile(self, tile1, side_tile_1, list_of_tiles):
         """Получает на вход плитку tile1, номер её стороны side_tile_1, и список всех плиток. Работает в паре с check_similarity(tile1, side_tile_1, tile2).
@@ -116,7 +104,7 @@ class Assembler():
             similarity[2,count]=s2
             count +=1
         i,j = np.where(similarity == min(similarity[0,:]))
-        if len(j) !=1:      #я без понятия почему, но np.where(similarity == s_min) иногда выдает больше одного ответа. И если не отсекать лишние появляется ошибка. 
+        if len(j) !=1:      #я без понятия почему, но np.where(similarity == s_min) иногда выдает больше одного ответа(с различными similarity). И если не отсекать лишние появляется ошибка. 
             j = j[0]
         answer = similarity[:,j].flatten()
         return answer
@@ -141,7 +129,10 @@ class Assembler():
         tile.smooth_body = np.rot90(tile.smooth_body,number_of_rotate)
         tile.flag = True
 
-    def rotate_tile(self, tile, side, location): # FIXME проверить работоспособность функции и написать комментарий
+    def find_number_of_rotates_and_rotate_the_tile(self, tile, side, location): # FIXME проверить работоспособность функции и написать комментарий
+        """Функция берет на вход плитку (tile), номер её стороны (side), и номер стороны плитки, которой соответствует данная tile (location),
+        рассчитывает на сколько оборотов нужно повернуть tile, чтобы она была повернута правильно относительно плитки которой она соответствует.
+        Далее вызывает функцию rotate, используя расчитаные параметры"""
         if location == 1:
             self.rotate(tile,location+side)
         elif location == 2:
@@ -169,38 +160,34 @@ def solve():
         tile.sliser()
         list_of_tiles.append(tile)
     assembler = Assembler(list_of_tiles)
-    #assembler.fill_sides_matching_to_the_sides(list_of_tiles)
-
-    """ 
-    for ti in list_of_tiles:
-        print(ti.sides_matching_to_the_sides)
-    count = 0
-    for ti in list_of_tiles:
-        for key in ti.rating_of_match:
-            if ti.rating_of_match[key] != None:
-                count +=1
-        print(ti.rating_of_match)    
-    """
 
     example_tile = list_of_tiles[0]
-    pair1 = assembler.find_similar_tile(example_tile,int(4),list_of_tiles)
-    pair2 = assembler.find_similar_tile(example_tile,int(1),list_of_tiles)
-    side_pair1 = pair1[2]
-    side_pair2 = pair2[2]
+    location_relative_to_the_pair1 = 4
+    location_relative_to_the_pair2 = 1
+    pair1 = assembler.find_similar_tile(example_tile,location_relative_to_the_pair1,list_of_tiles)
+    pair2 = assembler.find_similar_tile(example_tile,location_relative_to_the_pair2,list_of_tiles)
+    side_pair1 = int(pair1[2])
+    side_pair2 = int(pair2[2])
     print(pair1)
     print(pair2)
     result = assembler.verification(list_of_tiles[int(pair1[1])], list_of_tiles[int(pair2[1])], side_pair1, side_pair2, list_of_tiles)
-    example_tile_3 = list_of_tiles[int(result[0][1])]
+    example_tile_41 = list_of_tiles[int(result[0][1])]
+    example_tile_4 = list_of_tiles[int(pair1[1])]
+    example_tile_1 = list_of_tiles[int(pair2[1])]
+    assembler.find_number_of_rotates_and_rotate_the_tile(example_tile_41,int(result[2][2]),int(result[1]))
+    assembler.find_number_of_rotates_and_rotate_the_tile(list_of_tiles[int(result[2][1])],side_pair2,location_relative_to_the_pair2)
+
+    assembler.find_number_of_rotates_and_rotate_the_tile(example_tile_1,side_pair2,location_relative_to_the_pair2)
 
 
+    img_x = np.vstack((example_tile_4.body,example_tile.body))
+    img_y = np.vstack((example_tile_41.body, example_tile_1.body))
 
+    image = np.hstack((img_x,img_y))
+
+    tile.write_image(image,"image_test_first.ppm")
     print(result)
 
-    """
-    print(Tile.number_of_false_connections)
-    print(len(list_of_tiles))
-    print(count)
-    """
     #print_image()
 
 
