@@ -39,8 +39,7 @@ class Tile():
         self.rating_of_match = {1:None, 2:None, 3:None, 4:None}
         self.position_in_the_picture = 0
         self.flag = False #положение флага означает была ли повернута плитка относительно начального положения, и присвоили ли ей номер.
-        self.flag2 = False #положение флага означает участвовала ли плитка в процедуре нахождения номеров плиток
-
+        
     def smooth(self,number_of_smoothing):
         body = self.body
         J = body.copy()
@@ -90,7 +89,9 @@ class Assembler():
         similar_tiles = np.asarray(similar_tiles)
         i,j = np.where(similar_tiles == min(similar_tiles[:,0]))
         j
-        return similar_tiles[i,:].flatten()
+        a = similar_tiles[i,:].flatten()
+        answer = np.asarray(a[1:],dtype=np.uint8)
+        return answer
 
 
     def check_similarity(self, tile1, side_tile_1, tile2):
@@ -115,20 +116,20 @@ class Assembler():
         return answer
     
     def verification(self, pair1, pair2, list_of_tiles): # FIXME упростить вывод функции и написать комментарий
-        """Функция используется для проверки найденных связей. Получает на вход две плитки tile1 и tile2 которые связаны с некоторой третьей плиткой, и проверяет,
-        связаны ли эти плитки с еще одной общей. side_t1, side_t2 это стороны общей плитки с которыми связаны tile1, tile2 соответственно. list_of_tiles список хранящий все плитки.
-        возвращает
-        return =>> tuple(np.array[коэфф.соответствия(min), номер плитки(tile.number), номер стороны плитки(tile.side)],номер плитки(tile.number), 
-        np.array[коэфф.соответствия(min), номер плитки(tile.number), номер стороны плитки(tile.side)],номер плитки(tile.number))"""
-        s_p_1 = int(pair1[2]) #номер стороны которой соответствует pair1
-        s_p_2 = int(pair2[2]) #номер стороны которой соответствует pair1
+        """Функция используется для проверки найденных связей. Получает на вход два кортежа, pair1 и pair2, которые характеризуют две плитки, которые связаны с некоторой третьей плиткой, 
+        и проверяет,связаны ли эти плитки с еще одной общей. list_of_tiles список хранящий все плитки.
+        return =>> tuple(номер общей плитки(mutual_tile.number), номер соответствующей pair1 стороны плитки(mutual_tile.side)],номер стороны плитки(side_pair1),
+        номер общей плитки(mutual_tile.number), номер соответствующей pair2 стороны плитки(mutual_tile.side)],номер стороны плитки(side_pair2)) или False если общей плитки найти не удалось.
+        """
+        s_p_1 = int(pair1[1]) #номер стороны которой соответствует pair1
+        s_p_2 = int(pair2[1]) #номер стороны которой соответствует pair1
 
         ver_side_t1 = 4 if s_p_1 == 1 else s_p_1 - 1
         ver_side_t2 = 1 if s_p_2 == 4 else s_p_2 + 1
-        v1 = self.find_similar_tile(list_of_tiles[int(pair1[1])],ver_side_t1,list_of_tiles)
-        v2 = self.find_similar_tile(list_of_tiles[int(pair2[1])],ver_side_t2,list_of_tiles)
-        if v1[1]==v2[1]:
-            return (v1[1], v1[2], s_p_1, v2[1], v2[2], s_p_2)
+        v1 = self.find_similar_tile(list_of_tiles[int(pair1[0])],ver_side_t1,list_of_tiles)
+        v2 = self.find_similar_tile(list_of_tiles[int(pair2[0])],ver_side_t2,list_of_tiles)
+        if v1[0]==v2[0]:
+            return (int(v1[0]), int(v1[1]), s_p_1, int(v2[0]), int(v2[1]), s_p_2)
         else:
             return False
     
@@ -136,30 +137,50 @@ class Assembler():
         """Берет на вход плитку и целое число, означающее количество применений np.rot90() на эту плитку"""
         tile.body = np.rot90(tile.body, number_of_rotate)
         tile.smooth_body = np.rot90(tile.smooth_body,number_of_rotate)
+        tile.sliser()
         tile.flag = True
 
-    def find_number_of_rotates_and_rotate_the_tile(self, tile, side, location, tile_0): #FIXME расчет положения плиток и присвоение им номеров работает неправильно
-        """Функция берет на вход плитку (tile), номер её стороны (side), и номер стороны плитки, которой соответствует данная tile (location),
-        рассчитывает на сколько оборотов нужно повернуть tile, чтобы она была повернута правильно относительно плитки которой она соответствует. 
-        Далее вызывает функцию rotate, используя расчитаные параметры.
-        Далее расчитывает номер плитки на итоговой картинке относительно tile_0."""
-        if tile.flag == False and tile_0.flag==True:
-            if location == 1:
-                self.rotate(tile,location+side)
-                tile.position_in_the_picture = tile_0.position_in_the_picture + 1
-            elif location == 2:
-                self.rotate(tile, side)
-                tile.position_in_the_picture = tile_0.position_in_the_picture - (Tile.coefficient_for_find_number_of_the_tile * Tile.multiplier)
-            elif location == 3:
-                self.rotate(tile,location+side+2)
-                tile.position_in_the_picture = tile_0.position_in_the_picture - 1
-            elif location == 4:
-                self.rotate(tile, side+2)
-                tile.position_in_the_picture = tile_0.position_in_the_picture + (Tile.coefficient_for_find_number_of_the_tile * Tile.multiplier)
-            else:
-                print('ERROR')
+    def find_number_the_tile_in_the_pickture(self,tile,list_of_tiles):
+        tile_for_side_1 = self.find_similar_tile(tile, 1, list_of_tiles)
+        tile_for_side_2 = self.find_similar_tile(tile, 2, list_of_tiles)
+        tile_for_side_3 = self.find_similar_tile(tile, 3, list_of_tiles)
+        tile_for_side_4 = self.find_similar_tile(tile, 4, list_of_tiles)
+
+        result1 = self.verification(tile_for_side_1,tile_for_side_2, list_of_tiles)
+        result2 = self.verification(tile_for_side_2,tile_for_side_3, list_of_tiles)
+        result3 = self.verification(tile_for_side_3,tile_for_side_4, list_of_tiles)
+        result4 = self.verification(tile_for_side_4,tile_for_side_1, list_of_tiles)
+        """
+        print("in process")
+        print(tile_for_side_1[0])
+        print(result1)
+        print(result2)
+        print(result3)
+        print(result4)
+        """
+        if (result1 or result4) and list_of_tiles[tile_for_side_1[0]].flag == False:
+            self.rotate(list_of_tiles[tile_for_side_1[0]],tile_for_side_1[1]+1)
+            list_of_tiles[tile_for_side_1[0]].position_in_the_picture = tile.position_in_the_picture + 1
+            self.find_number_the_tile_in_the_pickture(list_of_tiles[tile_for_side_1[0]],list_of_tiles)
+
+        elif (result1 or result2) and list_of_tiles[tile_for_side_2[0]].flag == False:
+            self.rotate(list_of_tiles[tile_for_side_2[0]],tile_for_side_2[1])
+            list_of_tiles[tile_for_side_2[0]].position_in_the_picture = tile.position_in_the_picture - tile.coefficient_for_find_number_of_the_tile * tile.multiplier
+            self.find_number_the_tile_in_the_pickture(list_of_tiles[tile_for_side_2[0]],list_of_tiles)
+
+        elif (result2 or result3) and list_of_tiles[tile_for_side_3[0]].flag == False:
+            self.rotate(list_of_tiles[tile_for_side_3[0]],tile_for_side_3[1]+3)
+            list_of_tiles[tile_for_side_3[0]].position_in_the_picture = tile.position_in_the_picture - 1
+            self.find_number_the_tile_in_the_pickture(list_of_tiles[tile_for_side_3[0]],list_of_tiles)
+
+        elif (result3 or result4) and list_of_tiles[tile_for_side_4[0]].flag == False:
+            self.rotate(list_of_tiles[tile_for_side_4[0]],tile_for_side_4[1]+2)
+            list_of_tiles[tile_for_side_4[0]].position_in_the_picture = tile.position_in_the_picture + tile.coefficient_for_find_number_of_the_tile * tile.multiplier
+            self.find_number_the_tile_in_the_pickture(list_of_tiles[tile_for_side_4[0]],list_of_tiles)
+
         else:
-            pass
+            print("done!")
+
 
 
 
@@ -179,21 +200,7 @@ def solve():
     assembler = Assembler(list_of_tiles)
     first_tile = list_of_tiles[0]
     first_tile.flag = True
-    for til in list_of_tiles:
-        til.flag2 = True
-        #while True:
-        pairs_for_side = []
-        for i in range(4):
-            pairs_for_side.append(assembler.find_similar_tile(til, i+1, list_of_tiles))
-        for j in range(4):
-            result = assembler.verification(pairs_for_side[j-1], pairs_for_side[j], list_of_tiles)
-            if result:
-                ex1 = list_of_tiles[int(result[0])]
-                ex2 = list_of_tiles[int(result[3])]
-                assembler.find_number_of_rotates_and_rotate_the_tile(ex1, int(result[1]), int(result[2]), til)
-                assembler.find_number_of_rotates_and_rotate_the_tile(ex2, int(result[4]), int(result[5]), til)
-                
-
+    assembler.find_number_the_tile_in_the_pickture(first_tile,list_of_tiles)
         
 
     for ex in list_of_tiles:
