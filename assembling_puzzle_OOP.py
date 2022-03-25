@@ -1,12 +1,7 @@
 from typing import List
 import numpy as np
 import os
-from numpy.core.fromnumeric import shape
-from numpy.core.numeric import cross
-from numpy.lib import rot90
-from numpy.lib.function_base import append
-
-from numpy.typing import _32Bit
+from calculate_something import calculate_number_of_rotate
 
 W = 1200
 H = 900
@@ -26,7 +21,7 @@ def read_image(path):
 
 class Tile():
     number_of_tile = 0 
-    coefficient_for_find_number_of_the_tile = 0 # вычисляется как корень из (количество плиток/12)
+    coefficient_for_find_number_of_the_tile = 0 # вычисляется как корень из (количество плиток/12) при перемножении на multiplier дает количество плиток в строке
     multiplier = 4 # зависит от угла поворота первой плитки относительно истины. Если угол 0/180 то 4, иначе 3. 
 
     def __init__(self, body, number):
@@ -81,7 +76,7 @@ class Assembler():
     def find_similar_tile(self, tile1, side_tile_1, list_of_tiles):
         """Получает на вход плитку tile1, номер её стороны side_tile_1, и список всех плиток. Работает в паре с check_similarity(tile1, side_tile_1, tile2).
         возвращает плитку и номер стороны, которая подходит к tile1, side_tile_1 наилучшим образом.
-        return =>>  np.array [коэфф.соответствия(min), номер плитки(tile2.number), номер стороны плитки(tile2.side)] """
+        return =>>  np.array [номер плитки(tile2.number), номер стороны плитки(tile2.side)] """
         similar_tiles = []
         for tile in list_of_tiles:
             if tile != tile1:
@@ -122,7 +117,7 @@ class Assembler():
         номер общей плитки(mutual_tile.number), номер соответствующей pair2 стороны плитки(mutual_tile.side)],номер стороны плитки(side_pair2)) или False если общей плитки найти не удалось.
         """
         s_p_1 = int(pair1[1]) #номер стороны которой соответствует pair1
-        s_p_2 = int(pair2[1]) #номер стороны которой соответствует pair1
+        s_p_2 = int(pair2[1]) #номер стороны которой соответствует pair2
 
         ver_side_t1 = 4 if s_p_1 == 1 else s_p_1 - 1
         ver_side_t2 = 1 if s_p_2 == 4 else s_p_2 + 1
@@ -141,6 +136,8 @@ class Assembler():
         tile.flag = True
 
     def find_number_the_tile_in_the_pickture(self,tile,list_of_tiles):
+        if tile.flag==False:
+            print('flag false')
         tile_for_side_1 = self.find_similar_tile(tile, 1, list_of_tiles)
         tile_for_side_2 = self.find_similar_tile(tile, 2, list_of_tiles)
         tile_for_side_3 = self.find_similar_tile(tile, 3, list_of_tiles)
@@ -159,24 +156,28 @@ class Assembler():
         print(result4)
         """
         if (result1 or result4) and list_of_tiles[tile_for_side_1[0]].flag == False:
-            self.rotate(list_of_tiles[tile_for_side_1[0]],tile_for_side_1[1]+1)
+            self.rotate(list_of_tiles[tile_for_side_1[0]], calculate_number_of_rotate(1, tile_for_side_1[1]))
             list_of_tiles[tile_for_side_1[0]].position_in_the_picture = tile.position_in_the_picture + 1
-            self.find_number_the_tile_in_the_pickture(list_of_tiles[tile_for_side_1[0]],list_of_tiles)
+            pass
+          #  self.find_number_the_tile_in_the_pickture(list_of_tiles[tile_for_side_1[0]],list_of_tiles)
 
         elif (result1 or result2) and list_of_tiles[tile_for_side_2[0]].flag == False:
-            self.rotate(list_of_tiles[tile_for_side_2[0]],tile_for_side_2[1])
+            self.rotate(list_of_tiles[tile_for_side_2[0]], calculate_number_of_rotate(2, tile_for_side_2[1]))
             list_of_tiles[tile_for_side_2[0]].position_in_the_picture = tile.position_in_the_picture - tile.coefficient_for_find_number_of_the_tile * tile.multiplier
-            self.find_number_the_tile_in_the_pickture(list_of_tiles[tile_for_side_2[0]],list_of_tiles)
+            pass  
+          #  self.find_number_the_tile_in_the_pickture(list_of_tiles[tile_for_side_2[0]],list_of_tiles)
 
         elif (result2 or result3) and list_of_tiles[tile_for_side_3[0]].flag == False:
-            self.rotate(list_of_tiles[tile_for_side_3[0]],tile_for_side_3[1]+3)
+            self.rotate(list_of_tiles[tile_for_side_3[0]],calculate_number_of_rotate(3, tile_for_side_3[1]))
             list_of_tiles[tile_for_side_3[0]].position_in_the_picture = tile.position_in_the_picture - 1
-            self.find_number_the_tile_in_the_pickture(list_of_tiles[tile_for_side_3[0]],list_of_tiles)
+            pass
+          #  self.find_number_the_tile_in_the_pickture(list_of_tiles[tile_for_side_3[0]],list_of_tiles)
 
         elif (result3 or result4) and list_of_tiles[tile_for_side_4[0]].flag == False:
-            self.rotate(list_of_tiles[tile_for_side_4[0]],tile_for_side_4[1]+2)
+            self.rotate(list_of_tiles[tile_for_side_4[0]],calculate_number_of_rotate(4, tile_for_side_4[1]))
             list_of_tiles[tile_for_side_4[0]].position_in_the_picture = tile.position_in_the_picture + tile.coefficient_for_find_number_of_the_tile * tile.multiplier
-            self.find_number_the_tile_in_the_pickture(list_of_tiles[tile_for_side_4[0]],list_of_tiles)
+            pass
+        #  self.find_number_the_tile_in_the_pickture(list_of_tiles[tile_for_side_4[0]],list_of_tiles)
 
         else:
             print("done!")
@@ -199,13 +200,23 @@ def solve():
     Tile.coefficient_for_find_number_of_the_tile = (len(list_of_tiles)/12)**0.5
     assembler = Assembler(list_of_tiles)
     first_tile = list_of_tiles[0]
-    first_tile.flag = True
+    assembler.rotate(first_tile,1)
     assembler.find_number_the_tile_in_the_pickture(first_tile,list_of_tiles)
-        
 
+    for instance in list_of_tiles:
+        if instance.flag == True:
+            assembler.find_number_the_tile_in_the_pickture(instance,list_of_tiles) 
+    for instance in list_of_tiles:
+        if instance.flag == True:
+            assembler.find_number_the_tile_in_the_pickture(instance,list_of_tiles) 
+    flags = []
+    positions = []
     for ex in list_of_tiles:
-        print(ex.position_in_the_picture)
-        print(ex.flag)
+        positions.append(ex.position_in_the_picture)
+        flags.append(ex.flag)
+    print(positions)
+    print(flags)
 
+    
 if __name__ == "__main__":
     solve()
