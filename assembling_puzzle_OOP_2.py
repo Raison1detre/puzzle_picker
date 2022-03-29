@@ -10,7 +10,7 @@ MAX_VALUE = 255
 PATH = "C:\\Users\\alex\\my-py\\data\\0000_0000_0000\\tiles" # path to the folder of tiles (not folder of folders of tiles!)
 NUMBER_OF_SMOOTHING = 5 
 COEFFICIENT_OF_SINGLE_TON = 17 # коэффициент который определяет насколько однотонные стороны картинки будут выброшены из проверки
-COEFFICIENT_OF_SIMILARITY = 13
+COEFFICIENT_OF_SIMILARITY = 30
 
 list_of_tiles = []
 
@@ -20,6 +20,15 @@ def read_image(path):
     # skip 3 lines reserved for header and read image
     image = np.loadtxt(path, skiprows=3, dtype=np.uint8).reshape((h, w, CHANNEL_NUM))
     return image
+
+def write_image(path, img):
+    h, w = img.shape[:2]
+    # ppm format requires header in special format
+    header = f'P3\n{w} {h}\n{MAX_VALUE}\n'
+    with open(path, 'w') as f:
+        f.write(header)
+        for r, g, b in img.reshape((-1, CHANNEL_NUM)):
+            f.write(f'{r} {g} {b} ')
 
 class Tile():
     number_of_tile = 0 
@@ -65,24 +74,28 @@ class Tile():
         if np.mean(np.std(self.sides_before_smooth[1],axis=0)) <  COEFFICIENT_OF_SINGLE_TON: # Это сделано чтобы монотонные стороны без выделяющихся элементов не могли пройти по цепочке дальше, я пока не знаю как фильтровать ошибку с крайними монотонными сторонами
             self.sides_mask[1] = False
         sb = np.rot90(sb,1)
+        body = np.rot90(body,1)
 
         self.sides[4] = np.array(sb[:,h-1,:], dtype=np.int16)
         self.sides_before_smooth[4] = np.array(body[:,h-1,:], dtype=np.int16)
         if np.mean(np.std(self.sides_before_smooth[4],axis=0)) <  COEFFICIENT_OF_SINGLE_TON:
             self.sides_mask[4] = False
         sb = np.rot90(sb,1)
+        body = np.rot90(body,1)
 
         self.sides[3] = np.array(sb[:,w-1,:], dtype=np.int16)
         self.sides_before_smooth[3] = np.array(body[:,w-1,:], dtype=np.int16)
         if np.mean(np.std(self.sides_before_smooth[3],axis=0)) <  COEFFICIENT_OF_SINGLE_TON:
             self.sides_mask[3] = False
         sb = np.rot90(sb,1)
+        body = np.rot90(body,1)
 
         self.sides[2] = np.array(sb[:,h-1,:], dtype=np.int16)
         self.sides_before_smooth[2] = np.array(body[:,h-1,:], dtype=np.int16)
         if np.mean(np.std(self.sides_before_smooth[2],axis=0)) <  COEFFICIENT_OF_SINGLE_TON:
             self.sides_mask[2] = False
         sb = np.rot90(sb,1)
+        body = np.rot90(body,1)
 
 class Assembler():
     def __init__(self,list_of_tiles):
@@ -151,7 +164,6 @@ class Assembler():
         for i in range(1,5):
             tile_for_side.append(self.find_similar_tile(tile, i, list_of_tiles))
             if tile_for_side[i-1][1] != 0:
-                print(tile_for_side[i-1][0])
                 self.rotate(list_of_tiles[tile_for_side[i-1][0]], calculate_number_of_rotate(i, tile_for_side[i-1][1]))
                 if i == 1:
                     list_of_tiles[tile_for_side[i-1][0]].position_in_the_picture = tile.position_in_the_picture + 1
@@ -161,7 +173,7 @@ class Assembler():
                     list_of_tiles[tile_for_side[i-1][0]].position_in_the_picture = tile.position_in_the_picture - 1
                 elif i == 4:
                     list_of_tiles[tile_for_side[i-1][0]].position_in_the_picture = tile.position_in_the_picture + tile.coefficient_for_find_number_of_the_tile * tile.multiplier
-        print("done!")
+
 
 
 
@@ -213,25 +225,49 @@ def solve():
     assembler = Assembler(list_of_tiles)
 
     first_tile = list_of_tiles[0]
-    assembler.rotate(first_tile,1)
-    for instance in list_of_tiles:
-        if instance.flag == True:
-            assembler.find_number_the_tile_in_the_pickture(instance,list_of_tiles)
+    assembler.rotate(first_tile,0)
     
     for instance in list_of_tiles:
         if instance.flag == True:
             assembler.find_number_the_tile_in_the_pickture(instance,list_of_tiles)
     for instance in list_of_tiles:
         if instance.flag == True:
-            assembler.find_number_the_tile_in_the_pickture(instance,list_of_tiles)        
-
+            assembler.find_number_the_tile_in_the_pickture(instance,list_of_tiles)
+    for instance in list_of_tiles:
+        if instance.flag == True:
+            assembler.find_number_the_tile_in_the_pickture(instance,list_of_tiles)
+    for instance in list_of_tiles:
+        if instance.flag == True:
+            assembler.find_number_the_tile_in_the_pickture(instance,list_of_tiles)           
+    
     flags = []
     positions = []
     for ex in list_of_tiles:
         positions.append(ex.position_in_the_picture)
         flags.append(ex.flag)
     print(positions)
+    sorted_positions = sorted(positions)
     print(flags)
+    tiles_with_result_order =[]
+    for  sp in sorted_positions:
+        for til in list_of_tiles:
+            if til.position_in_the_picture == sp:
+                tiles_with_result_order.append(til.body)
+
+    result_img = np.zeros((H, W, CHANNEL_NUM), dtype=np.uint8)
+    dims = np.array([t.body.shape[:2] for t in list_of_tiles])
+    h, w = np.min(dims, axis=0)
+    x_nodes = np.arange(0, W, w)
+    y_nodes = np.arange(0, H, h)
+    xx, yy = np.meshgrid(x_nodes, y_nodes)
+    nodes = np.vstack((xx.flatten(), yy.flatten())).T
+
+    for (x, y), tile in zip(nodes, tiles_with_result_order):
+        result_img[y: y + h, x: x + w] = tile[:h, :w]
+
+    output_path = "nakonec_to2.ppm"
+    write_image(output_path, result_img)
+
 
     
 if __name__ == "__main__":
