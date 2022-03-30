@@ -1,4 +1,3 @@
-from typing import List
 import numpy as np
 import os
 from calculate_something import calculate_number_of_rotate
@@ -7,10 +6,10 @@ W = 1200
 H = 900
 CHANNEL_NUM = 3  # we work with rgb images
 MAX_VALUE = 255
-PATH = "C:\\Users\\alex\\my-py\\data\\0000_0000_0000\\tiles" # path to the folder of tiles (not folder of folders of tiles!)
+PATH = "C:\\Users\\alex\\my-py\\data\\0000_0001_0001\\tiles" # path to the folder of tiles (not folder of folders of tiles!)
 NUMBER_OF_SMOOTHING = 5 
-COEFFICIENT_OF_SINGLE_TON = 17 # коэффициент который определяет насколько однотонные стороны картинки будут выброшены из проверки
-COEFFICIENT_OF_SIMILARITY = 30
+COEFFICIENT_OF_SINGLE_TON = 1 # коэффициент который определяет насколько однотонные стороны картинки будут выброшены из проверки
+COEFFICIENT_OF_SIMILARITY = 1
 
 list_of_tiles = []
 
@@ -53,46 +52,36 @@ class Tile():
             J[1:-1] = (J[1:-1] // 2 + J[:-2] // 4 + J[2:] // 4)
             J[:, 1:-1] = (J[:, 1:-1] // 2 + J[:, :-2] // 4 + J[:, 2:] // 4)
         self.smooth_body = J
-
-    def write_image(self, img, path):
-        img = img
-        h, w = img.shape[:2]
-        # ppm format requires header in special format
-        header = f'P3\n{w} {h}\n{MAX_VALUE}\n'
-        with open(path, 'w') as f:
-            f.write(header)
-            for r, g, b in img.reshape((-1, CHANNEL_NUM)):
-                f.write(f'{r} {g} {b} ')
-    
-    def sliser(self):
+   
+    def sliser(self, coefficient_of_single_ton):
         sb = self.body
         body = self.body
         h,w = sb.shape[:2]
 
         self.sides[1] = np.array(sb[:,w-1,:], dtype=np.int16)
         self.sides_before_smooth[1] = np.array(body[:,w-1,:], dtype=np.int16)
-        if np.mean(np.std(self.sides_before_smooth[1],axis=0)) <  COEFFICIENT_OF_SINGLE_TON: # Это сделано чтобы монотонные стороны без выделяющихся элементов не могли пройти по цепочке дальше, я пока не знаю как фильтровать ошибку с крайними монотонными сторонами
+        if np.mean(np.std(self.sides_before_smooth[1],axis=0)) <  coefficient_of_single_ton: # Это сделано чтобы монотонные стороны без выделяющихся элементов не могли пройти по цепочке дальше, я пока не знаю как фильтровать ошибку с крайними монотонными сторонами
             self.sides_mask[1] = False
         sb = np.rot90(sb,1)
         body = np.rot90(body,1)
 
         self.sides[4] = np.array(sb[:,h-1,:], dtype=np.int16)
         self.sides_before_smooth[4] = np.array(body[:,h-1,:], dtype=np.int16)
-        if np.mean(np.std(self.sides_before_smooth[4],axis=0)) <  COEFFICIENT_OF_SINGLE_TON:
+        if np.mean(np.std(self.sides_before_smooth[4],axis=0)) < coefficient_of_single_ton:
             self.sides_mask[4] = False
         sb = np.rot90(sb,1)
         body = np.rot90(body,1)
 
         self.sides[3] = np.array(sb[:,w-1,:], dtype=np.int16)
         self.sides_before_smooth[3] = np.array(body[:,w-1,:], dtype=np.int16)
-        if np.mean(np.std(self.sides_before_smooth[3],axis=0)) <  COEFFICIENT_OF_SINGLE_TON:
+        if np.mean(np.std(self.sides_before_smooth[3],axis=0)) < coefficient_of_single_ton:
             self.sides_mask[3] = False
         sb = np.rot90(sb,1)
         body = np.rot90(body,1)
 
         self.sides[2] = np.array(sb[:,h-1,:], dtype=np.int16)
         self.sides_before_smooth[2] = np.array(body[:,h-1,:], dtype=np.int16)
-        if np.mean(np.std(self.sides_before_smooth[2],axis=0)) <  COEFFICIENT_OF_SINGLE_TON:
+        if np.mean(np.std(self.sides_before_smooth[2],axis=0)) < coefficient_of_single_ton:
             self.sides_mask[2] = False
         sb = np.rot90(sb,1)
         body = np.rot90(body,1)
@@ -105,7 +94,7 @@ class Assembler():
         y_nodes = np.arange(0, H, h)
         self.matrix_of_ansvers = np.zeros((len(y_nodes),len(x_nodes),2), dtype=np.uint8)
                 
-    def find_similar_tile(self, tile1, side_tile_1, list_of_tiles):
+    def find_similar_tile(self, tile1, side_tile_1, list_of_tiles, coeficient_of_similarity):
         """Получает на вход плитку tile1, номер её стороны side_tile_1, и список всех плиток. Работает в паре с check_similarity(tile1, side_tile_1, tile2).
         возвращает плитку и номер стороны, которая подходит к tile1, side_tile_1 наилучшим образом.
         return =>>  np.array [номер плитки(tile2.number), номер стороны плитки(tile2.side)] """
@@ -117,7 +106,7 @@ class Assembler():
         i,j = np.where(similar_tiles == min(similar_tiles[:,0]))
         j
         a = similar_tiles[i,:].flatten()
-        if a[0] > COEFFICIENT_OF_SIMILARITY:
+        if a[0] > coeficient_of_similarity:
             return np.asarray([0,0],dtype=np.uint8)
         answer = np.asarray(a[1:],dtype=np.uint8)
         return answer
@@ -150,21 +139,21 @@ class Assembler():
         return answer
     
    
-    def rotate(self, tile, number_of_rotate):
+    def rotate(self, tile, number_of_rotate,coeficient_of_single_ton):
         """Берет на вход плитку и целое число, означающее количество применений np.rot90() на эту плитку"""
         tile.body = np.rot90(tile.body, number_of_rotate)
         tile.smooth_body = np.rot90(tile.smooth_body,number_of_rotate)
-        tile.sliser()
+        tile.sliser(coeficient_of_single_ton)
         tile.flag = True
     
-    def find_number_the_tile_in_the_pickture(self,tile,list_of_tiles):
+    def find_number_the_tile_in_the_pickture(self,tile,list_of_tiles,coeficient_of_similarity,coeficient_of_single_ton):
         if tile.flag==False:
             print('flag false')
         tile_for_side = []
         for i in range(1,5):
-            tile_for_side.append(self.find_similar_tile(tile, i, list_of_tiles))
+            tile_for_side.append(self.find_similar_tile(tile, i, list_of_tiles,coeficient_of_similarity))
             if tile_for_side[i-1][1] != 0:
-                self.rotate(list_of_tiles[tile_for_side[i-1][0]], calculate_number_of_rotate(i, tile_for_side[i-1][1]))
+                self.rotate(list_of_tiles[tile_for_side[i-1][0]], calculate_number_of_rotate(i, tile_for_side[i-1][1]),coeficient_of_single_ton)
                 if i == 1:
                     list_of_tiles[tile_for_side[i-1][0]].position_in_the_picture = tile.position_in_the_picture + 1
                 elif i == 2:
@@ -174,80 +163,66 @@ class Assembler():
                 elif i == 4:
                     list_of_tiles[tile_for_side[i-1][0]].position_in_the_picture = tile.position_in_the_picture + tile.coefficient_for_find_number_of_the_tile * tile.multiplier
 
-
-
-
-
-    '''
-        if (result1 or result4) and list_of_tiles[tile_for_side_1[0]].flag == False:
-            self.rotate(list_of_tiles[tile_for_side_1[0]], calculate_number_of_rotate(1, tile_for_side_1[1]))
-            
-            pass
-          #  self.find_number_the_tile_in_the_pickture(list_of_tiles[tile_for_side_1[0]],list_of_tiles)
-
-        elif (result1 or result2) and list_of_tiles[tile_for_side_2[0]].flag == False:
-            self.rotate(list_of_tiles[tile_for_side_2[0]], calculate_number_of_rotate(2, tile_for_side_2[1]))
-            list_of_tiles[tile_for_side_2[0]].position_in_the_picture = tile.position_in_the_picture - tile.coefficient_for_find_number_of_the_tile * tile.multiplier
-            pass  
-          #  self.find_number_the_tile_in_the_pickture(list_of_tiles[tile_for_side_2[0]],list_of_tiles)
-
-        elif (result2 or result3) and list_of_tiles[tile_for_side_3[0]].flag == False:
-            self.rotate(list_of_tiles[tile_for_side_3[0]],calculate_number_of_rotate(3, tile_for_side_3[1]))
-            list_of_tiles[tile_for_side_3[0]].position_in_the_picture = tile.position_in_the_picture - 1
-            pass
-          #  self.find_number_the_tile_in_the_pickture(list_of_tiles[tile_for_side_3[0]],list_of_tiles)
-
-        elif (result3 or result4) and list_of_tiles[tile_for_side_4[0]].flag == False:
-            self.rotate(list_of_tiles[tile_for_side_4[0]],calculate_number_of_rotate(4, tile_for_side_4[1]))
-            list_of_tiles[tile_for_side_4[0]].position_in_the_picture = tile.position_in_the_picture + tile.coefficient_for_find_number_of_the_tile * tile.multiplier
-            pass
-        #  self.find_number_the_tile_in_the_pickture(list_of_tiles[tile_for_side_4[0]],list_of_tiles)
-
-        else:
-            print("done!")
-    '''
-
-
-
-def print_image():
-    for i in range(len(list_of_tiles)):
-        til = list_of_tiles[i]
-        til.write_image(f"image_test{i}.ppm")
-
-
-def solve():
-    for t in sorted(os.listdir(PATH)):
-        tile = Tile(read_image(os.path.join(PATH, t)),int(t[0:4]))
-        tile.smooth(NUMBER_OF_SMOOTHING)
-        tile.sliser()
-        list_of_tiles.append(tile)
-    Tile.coefficient_for_find_number_of_the_tile = int((len(list_of_tiles)/12)**0.5)
+def main_loop_of_solve(list_of_tiles,coeficient_of_similarity,number_of_rotate_first_tile,coeficient_of_single_ton):
     assembler = Assembler(list_of_tiles)
+    assembler.rotate(list_of_tiles[0],number_of_rotate_first_tile,COEFFICIENT_OF_SINGLE_TON)
+    coeficient = COEFFICIENT_OF_SIMILARITY + coeficient_of_similarity
+    coeficient_of_ton = COEFFICIENT_OF_SINGLE_TON - coeficient_of_single_ton
+    for instance in list_of_tiles:
+        if instance.flag == True:
+            assembler.find_number_the_tile_in_the_pickture(instance,list_of_tiles,coeficient,coeficient_of_ton) 
+    for instance in list_of_tiles:
+        if instance.flag == True:
+            assembler.find_number_the_tile_in_the_pickture(instance,list_of_tiles,coeficient,coeficient_of_ton)
 
-    first_tile = list_of_tiles[0]
-    assembler.rotate(first_tile,0)
-    
-    for instance in list_of_tiles:
-        if instance.flag == True:
-            assembler.find_number_the_tile_in_the_pickture(instance,list_of_tiles)
-    for instance in list_of_tiles:
-        if instance.flag == True:
-            assembler.find_number_the_tile_in_the_pickture(instance,list_of_tiles)
-    for instance in list_of_tiles:
-        if instance.flag == True:
-            assembler.find_number_the_tile_in_the_pickture(instance,list_of_tiles)
-    for instance in list_of_tiles:
-        if instance.flag == True:
-            assembler.find_number_the_tile_in_the_pickture(instance,list_of_tiles)           
-    
+def solve(list_of_tiles):
+    number_of_rotate_first_tile = 0
+    coeficient_of_similarity = 0
+    coeficient_of_single_ton = 0
+    main_loop_of_solve(list_of_tiles,coeficient_of_similarity,number_of_rotate_first_tile,coeficient_of_single_ton)
     flags = []
     positions = []
     for ex in list_of_tiles:
         positions.append(ex.position_in_the_picture)
-        flags.append(ex.flag)
-    print(positions)
+        flags.append(ex.flag)    
     sorted_positions = sorted(positions)
-    print(flags)
+    if  (sorted_positions[-1] - sorted_positions[0]) > (len(list_of_tiles)-1):
+        number_of_rotate_first_tile +=1
+        for tile in list_of_tiles:
+            tile.flag = False
+            tile.position_in_the_picture = 0
+
+    flag = True
+    while flag == True:
+        flag = False
+        main_loop_of_solve(list_of_tiles,coeficient_of_similarity,number_of_rotate_first_tile,coeficient_of_single_ton)
+        flags = []
+        positions = []
+        for ex in list_of_tiles:
+            positions.append(ex.position_in_the_picture)
+            flags.append(ex.flag)    
+        sorted_positions = sorted(positions)
+        for f in flags:
+            if f == False:
+                flag = True
+        coeficient_of_similarity += 4
+        coeficient_of_single_ton += 1
+
+    return sorted_positions
+
+
+
+
+def main_function():
+    for t in sorted(os.listdir(PATH)):
+        tile = Tile(read_image(os.path.join(PATH, t)),int(t[0:4]))
+        tile.smooth(NUMBER_OF_SMOOTHING)
+        tile.sliser(COEFFICIENT_OF_SINGLE_TON)
+        list_of_tiles.append(tile)
+        print(tile.number, tile.sides_mask)
+    Tile.coefficient_for_find_number_of_the_tile = int((len(list_of_tiles)/12)**0.5)
+    sorted_positions = solve(list_of_tiles)
+    print(sorted_positions)
     tiles_with_result_order =[]
     for  sp in sorted_positions:
         for til in list_of_tiles:
@@ -271,4 +246,4 @@ def solve():
 
     
 if __name__ == "__main__":
-    solve()
+    main_function()
