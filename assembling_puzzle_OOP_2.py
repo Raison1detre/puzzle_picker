@@ -6,10 +6,10 @@ W = 1200
 H = 900
 CHANNEL_NUM = 3  # we work with rgb images
 MAX_VALUE = 255
-PATH = "C:\\Users\\alex\\my-py\\data\\0000_0001_0001\\tiles" # path to the folder of tiles (not folder of folders of tiles!)
+PATH = "C:\\Users\\alex\\my-py\\data\\0000_0002_0000\\tiles" # path to the folder of tiles (not folder of folders of tiles!)
 NUMBER_OF_SMOOTHING = 5 
-COEFFICIENT_OF_SINGLE_TON = 1 # коэффициент который определяет насколько однотонные стороны картинки будут выброшены из проверки
-COEFFICIENT_OF_SIMILARITY = 1
+NUMBER_OF_ROTATE_FIRST_TILE = 0 
+COEFFICIENT_OF_SIMILARITY = 0.2
 
 list_of_tiles = []
 
@@ -32,7 +32,7 @@ def write_image(path, img):
 class Tile():
     number_of_tile = 0 
     coefficient_for_find_number_of_the_tile = 0 # вычисляется как корень из (количество плиток/12) при перемножении на multiplier дает количество плиток в строке
-    multiplier = 4 # зависит от угла поворота первой плитки относительно истины. Если угол 0/180 то 4, иначе 3. 
+    multiplier = 4 # зависит от угла поворота первой плитки относительно истины. Если угол 0/180 то 4, иначе 3. Update: В нашем случае всегда 4, так как проверка алгоритмомт с точностью 0/180 
 
     def __init__(self, body, number):
         self.body = body
@@ -53,36 +53,28 @@ class Tile():
             J[:, 1:-1] = (J[:, 1:-1] // 2 + J[:, :-2] // 4 + J[:, 2:] // 4)
         self.smooth_body = J
    
-    def sliser(self, coefficient_of_single_ton):
+    def sliser(self):
         sb = self.body
         body = self.body
         h,w = sb.shape[:2]
 
         self.sides[1] = np.array(sb[:,w-1,:], dtype=np.int16)
         self.sides_before_smooth[1] = np.array(body[:,w-1,:], dtype=np.int16)
-        if np.mean(np.std(self.sides_before_smooth[1],axis=0)) <  coefficient_of_single_ton: # Это сделано чтобы монотонные стороны без выделяющихся элементов не могли пройти по цепочке дальше, я пока не знаю как фильтровать ошибку с крайними монотонными сторонами
-            self.sides_mask[1] = False
         sb = np.rot90(sb,1)
         body = np.rot90(body,1)
 
         self.sides[4] = np.array(sb[:,h-1,:], dtype=np.int16)
         self.sides_before_smooth[4] = np.array(body[:,h-1,:], dtype=np.int16)
-        if np.mean(np.std(self.sides_before_smooth[4],axis=0)) < coefficient_of_single_ton:
-            self.sides_mask[4] = False
         sb = np.rot90(sb,1)
         body = np.rot90(body,1)
 
         self.sides[3] = np.array(sb[:,w-1,:], dtype=np.int16)
         self.sides_before_smooth[3] = np.array(body[:,w-1,:], dtype=np.int16)
-        if np.mean(np.std(self.sides_before_smooth[3],axis=0)) < coefficient_of_single_ton:
-            self.sides_mask[3] = False
         sb = np.rot90(sb,1)
         body = np.rot90(body,1)
 
         self.sides[2] = np.array(sb[:,h-1,:], dtype=np.int16)
         self.sides_before_smooth[2] = np.array(body[:,h-1,:], dtype=np.int16)
-        if np.mean(np.std(self.sides_before_smooth[2],axis=0)) < coefficient_of_single_ton:
-            self.sides_mask[2] = False
         sb = np.rot90(sb,1)
         body = np.rot90(body,1)
 
@@ -94,7 +86,7 @@ class Assembler():
         y_nodes = np.arange(0, H, h)
         self.matrix_of_ansvers = np.zeros((len(y_nodes),len(x_nodes),2), dtype=np.uint8)
                 
-    def find_similar_tile(self, tile1, side_tile_1, list_of_tiles, coeficient_of_similarity):
+    def find_similar_tile(self, tile1, side_tile_1, list_of_tiles):
         """Получает на вход плитку tile1, номер её стороны side_tile_1, и список всех плиток. Работает в паре с check_similarity(tile1, side_tile_1, tile2).
         возвращает плитку и номер стороны, которая подходит к tile1, side_tile_1 наилучшим образом.
         return =>>  np.array [номер плитки(tile2.number), номер стороны плитки(tile2.side)] """
@@ -106,7 +98,10 @@ class Assembler():
         i,j = np.where(similar_tiles == min(similar_tiles[:,0]))
         j
         a = similar_tiles[i,:].flatten()
-        if a[0] > coeficient_of_similarity:
+        s_f_t_a  = list_of_tiles[int(a[1])]
+        coefficient = np.mean(np.std(s_f_t_a.sides_before_smooth[int(a[2])], axis=0)) * COEFFICIENT_OF_SIMILARITY
+
+        if a[0] > coefficient:
             return np.asarray([0,0],dtype=np.uint8)
         answer = np.asarray(a[1:],dtype=np.uint8)
         return answer
@@ -139,74 +134,79 @@ class Assembler():
         return answer
     
    
-    def rotate(self, tile, number_of_rotate,coeficient_of_single_ton):
+    def rotate(self, tile, number_of_rotate):
         """Берет на вход плитку и целое число, означающее количество применений np.rot90() на эту плитку"""
+        if tile.flag == True:
+            print('error')
         tile.body = np.rot90(tile.body, number_of_rotate)
         tile.smooth_body = np.rot90(tile.smooth_body,number_of_rotate)
-        tile.sliser(coeficient_of_single_ton)
+        tile.sliser()
         tile.flag = True
     
-    def find_number_the_tile_in_the_pickture(self,tile,list_of_tiles,coeficient_of_similarity,coeficient_of_single_ton):
+    def find_number_the_tile_in_the_pickture(self,tile,list_of_tiles):
         if tile.flag==False:
             print('flag false')
         tile_for_side = []
         for i in range(1,5):
-            tile_for_side.append(self.find_similar_tile(tile, i, list_of_tiles,coeficient_of_similarity))
-            if tile_for_side[i-1][1] != 0:
-                self.rotate(list_of_tiles[tile_for_side[i-1][0]], calculate_number_of_rotate(i, tile_for_side[i-1][1]),coeficient_of_single_ton)
-                if i == 1:
-                    list_of_tiles[tile_for_side[i-1][0]].position_in_the_picture = tile.position_in_the_picture + 1
-                elif i == 2:
-                    list_of_tiles[tile_for_side[i-1][0]].position_in_the_picture = tile.position_in_the_picture - tile.coefficient_for_find_number_of_the_tile * tile.multiplier
-                elif i == 3:
-                    list_of_tiles[tile_for_side[i-1][0]].position_in_the_picture = tile.position_in_the_picture - 1
-                elif i == 4:
-                    list_of_tiles[tile_for_side[i-1][0]].position_in_the_picture = tile.position_in_the_picture + tile.coefficient_for_find_number_of_the_tile * tile.multiplier
+            tile_for_side.append(self.find_similar_tile(tile, i, list_of_tiles))
+            if list_of_tiles[tile_for_side[i-1][0]].flag == True:
+                continue
+            else:
+                if tile_for_side[i-1][1] !=0 :
+                    self.rotate(list_of_tiles[tile_for_side[i-1][0]], calculate_number_of_rotate(i, tile_for_side[i-1][1]))
+                    if i == 1:
+                        list_of_tiles[tile_for_side[i-1][0]].position_in_the_picture = tile.position_in_the_picture + 1
+                    elif i == 2:
+                        list_of_tiles[tile_for_side[i-1][0]].position_in_the_picture = tile.position_in_the_picture - tile.coefficient_for_find_number_of_the_tile * tile.multiplier
+                    elif i == 3:
+                        list_of_tiles[tile_for_side[i-1][0]].position_in_the_picture = tile.position_in_the_picture - 1
+                    elif i == 4:
+                        list_of_tiles[tile_for_side[i-1][0]].position_in_the_picture = tile.position_in_the_picture + tile.coefficient_for_find_number_of_the_tile * tile.multiplier
 
-def main_loop_of_solve(list_of_tiles,coeficient_of_similarity,number_of_rotate_first_tile,coeficient_of_single_ton):
+def main_loop_of_solve(list_of_tiles,number_of_rotate_first_tile):
     assembler = Assembler(list_of_tiles)
-    assembler.rotate(list_of_tiles[0],number_of_rotate_first_tile,COEFFICIENT_OF_SINGLE_TON)
-    coeficient = COEFFICIENT_OF_SIMILARITY + coeficient_of_similarity
-    coeficient_of_ton = COEFFICIENT_OF_SINGLE_TON - coeficient_of_single_ton
+
+    if list_of_tiles[0].flag == False:
+        assembler.rotate(list_of_tiles[0],number_of_rotate_first_tile)
+
     for instance in list_of_tiles:
         if instance.flag == True:
-            assembler.find_number_the_tile_in_the_pickture(instance,list_of_tiles,coeficient,coeficient_of_ton) 
+            assembler.find_number_the_tile_in_the_pickture(instance,list_of_tiles) 
     for instance in list_of_tiles:
         if instance.flag == True:
-            assembler.find_number_the_tile_in_the_pickture(instance,list_of_tiles,coeficient,coeficient_of_ton)
+            assembler.find_number_the_tile_in_the_pickture(instance,list_of_tiles) 
+    for instance in list_of_tiles:
+        if instance.flag == True:
+            assembler.find_number_the_tile_in_the_pickture(instance,list_of_tiles) 
+
+       
 
 def solve(list_of_tiles):
-    number_of_rotate_first_tile = 0
-    coeficient_of_similarity = 0
-    coeficient_of_single_ton = 0
-    main_loop_of_solve(list_of_tiles,coeficient_of_similarity,number_of_rotate_first_tile,coeficient_of_single_ton)
-    flags = []
-    positions = []
-    for ex in list_of_tiles:
-        positions.append(ex.position_in_the_picture)
-        flags.append(ex.flag)    
-    sorted_positions = sorted(positions)
-    if  (sorted_positions[-1] - sorted_positions[0]) > (len(list_of_tiles)-1):
-        number_of_rotate_first_tile +=1
-        for tile in list_of_tiles:
-            tile.flag = False
-            tile.position_in_the_picture = 0
-
-    flag = True
-    while flag == True:
-        flag = False
-        main_loop_of_solve(list_of_tiles,coeficient_of_similarity,number_of_rotate_first_tile,coeficient_of_single_ton)
+    global NUMBER_OF_ROTATE_FIRST_TILE
+    global COEFFICIENT_OF_SIMILARITY
+    for i in range(5):
+        main_loop_of_solve(list_of_tiles,NUMBER_OF_ROTATE_FIRST_TILE)
         flags = []
         positions = []
         for ex in list_of_tiles:
             positions.append(ex.position_in_the_picture)
             flags.append(ex.flag)    
+        control = [True]*len(flags)
         sorted_positions = sorted(positions)
-        for f in flags:
-            if f == False:
-                flag = True
-        coeficient_of_similarity += 4
-        coeficient_of_single_ton += 1
+        if  (sorted_positions[-1] - sorted_positions[0]) > (len(list_of_tiles)-1):
+            NUMBER_OF_ROTATE_FIRST_TILE +=1
+            for tile in list_of_tiles:
+                tile.flag = False
+                tile.position_in_the_picture = 0
+            if i != 0:
+                COEFFICIENT_OF_SIMILARITY = COEFFICIENT_OF_SIMILARITY - (i-1)*0.2
+            print('break1')
+            solve(list_of_tiles)
+        elif flags == control:
+            return sorted_positions
+        COEFFICIENT_OF_SIMILARITY += i*0.2
+        print(i)
+       
 
     return sorted_positions
 
@@ -217,9 +217,9 @@ def main_function():
     for t in sorted(os.listdir(PATH)):
         tile = Tile(read_image(os.path.join(PATH, t)),int(t[0:4]))
         tile.smooth(NUMBER_OF_SMOOTHING)
-        tile.sliser(COEFFICIENT_OF_SINGLE_TON)
+        tile.sliser()
         list_of_tiles.append(tile)
-        print(tile.number, tile.sides_mask)
+        #print(tile.number, tile.sides_mask)
     Tile.coefficient_for_find_number_of_the_tile = int((len(list_of_tiles)/12)**0.5)
     sorted_positions = solve(list_of_tiles)
     print(sorted_positions)
@@ -228,7 +228,7 @@ def main_function():
         for til in list_of_tiles:
             if til.position_in_the_picture == sp:
                 tiles_with_result_order.append(til.body)
-
+    
     result_img = np.zeros((H, W, CHANNEL_NUM), dtype=np.uint8)
     dims = np.array([t.body.shape[:2] for t in list_of_tiles])
     h, w = np.min(dims, axis=0)
