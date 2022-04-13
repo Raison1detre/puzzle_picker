@@ -1,20 +1,14 @@
 from typing import List
 import numpy as np
 import os
-from numpy.core.fromnumeric import shape
-from numpy.core.numeric import cross
-from numpy.lib import rot90
-from numpy.lib.function_base import append
-
-from numpy.typing import _32Bit
+from calculate_something import calculate_number_of_rotate
 
 W = 1200
 H = 900
 CHANNEL_NUM = 3  # we work with rgb images
 MAX_VALUE = 255
-PATH = "C:\\Users\\alex\\my-py\\tiles" # path to the folder of tiles (not folder of folders of tiles!)
+PATH = "C:\\Users\\alex\\my-py\\data\\0000_0000_0000\\tiles" # path to the folder of tiles (not folder of folders of tiles!)
 NUMBER_OF_SMOOTHING = 5 
-SIMILARITY_COEFFICIENT = 17
 
 list_of_tiles = []
 
@@ -26,6 +20,10 @@ def read_image(path):
     return image
 
 class Tile():
+    number_of_tile = 0 
+    coefficient_for_find_number_of_the_tile = 0 # вычисляется как корень из (количество плиток/12) при перемножении на multiplier дает количество плиток в строке
+    multiplier = 4 # зависит от угла поворота первой плитки относительно истины. Если угол 0/180 то 4, иначе 3. 
+
     def __init__(self, body, number):
         self.body = body
         self.smooth_body = None
@@ -34,7 +32,9 @@ class Tile():
         self.sides = {1:None, 2:None, 3:None, 4:None}
         self.sides_matching_to_the_sides = {1:None, 2:None, 3:None, 4:None}
         self.rating_of_match = {1:None, 2:None, 3:None, 4:None}
-
+        self.position_in_the_picture = 0
+        self.flag = False #положение флага означает была ли повернута плитка относительно начального положения, и присвоили ли ей номер.
+        
     def smooth(self,number_of_smoothing):
         body = self.body
         J = body.copy()
@@ -43,8 +43,8 @@ class Tile():
             J[:, 1:-1] = (J[:, 1:-1] // 2 + J[:, :-2] // 4 + J[:, 2:] // 4)
         self.smooth_body = J
 
-    def write_image(self, path):
-        img = self.body
+    def write_image(self, img, path):
+        img = img
         h, w = img.shape[:2]
         # ppm format requires header in special format
         header = f'P3\n{w} {h}\n{MAX_VALUE}\n'
@@ -65,49 +65,125 @@ class Tile():
         self.sides[4] = np.array(sb[:,h-1,0], dtype=np.int16)
         sb = np.rot90(sb,1)
 
-
-def fill_sides_matching_to_the_sides(list_of_tiles):
-    """Получает на вход список всех плиток list_of_tiles. Для каждой плитки применяет find_similar_tile(tile,side,list_of_tiles) и по результатам 
-    заполняет self.sides_matching_to_the_sides и self.rating_of_match
-    return =>> None"""
-    for tile in list_of_tiles:
-        for side in tile.sides_matching_to_the_sides:
-            if tile.sides_matching_to_the_sides[side] == None:
-                tile_match = find_similar_tile(tile,side,list_of_tiles)
-                tile.sides_matching_to_the_sides[side] = (int(tile_match[0][1]),int(tile_match[0][2]))
-                tile.rating_of_match[side] = tile_match[0][0]
+class Assembler():
+    def __init__(self,list_of_tiles):
+        dims = np.array([t.body.shape[:2] for t in list_of_tiles])
+        h, w = np.min(dims, axis=0)
+        x_nodes = np.arange(0, W, w)
+        y_nodes = np.arange(0, H, h)
+        self.matrix_of_ansvers = np.zeros((len(y_nodes),len(x_nodes),2), dtype=np.uint8)
                 
-def find_similar_tile(tile1, side_tile_1, list_of_tiles):
-    """Получает на вход плитку tile1, номер её стороны side_tile_1, и список всех плиток. Работает в паре с check_similarity(tile1, side_tile_1, tile2).
-    возвращает плитку и номер стороны, которая подходит к tile1, side_tile_1 наилучшим образом.
-    return =>>  np.array [коэфф.соответствия(min), номер плитки(tile2.number), номер стороны плитки(tile2.side)] """
-    similar_tiles = []
-    for tile in list_of_tiles:
-        if tile != tile1:
-            similar_tiles.append(check_similarity(tile1,side_tile_1,tile))
-    similar_tiles = np.array(similar_tiles)
-    i,j = np.where(similar_tiles == min(similar_tiles[:,0]))
-    return similar_tiles[i,:]
+    def find_similar_tile(self, tile1, side_tile_1, list_of_tiles):
+        """Получает на вход плитку tile1, номер её стороны side_tile_1, и список всех плиток. Работает в паре с check_similarity(tile1, side_tile_1, tile2).
+        возвращает плитку и номер стороны, которая подходит к tile1, side_tile_1 наилучшим образом.
+        return =>>  np.array [номер плитки(tile2.number), номер стороны плитки(tile2.side)] """
+        similar_tiles = []
+        for tile in list_of_tiles:
+            if tile != tile1:
+                similar_tiles.append(self.check_similarity(tile1,side_tile_1,tile))
+        similar_tiles = np.asarray(similar_tiles)
+        i,j = np.where(similar_tiles == min(similar_tiles[:,0]))
+        j
+        a = similar_tiles[i,:].flatten()
+        answer = np.asarray(a[1:],dtype=np.uint8)
+        return answer
 
 
-def check_similarity(tile1, side_tile_1, tile2):
-    """Получает на вход плитку tile1 и номер её стороны side_tile_1, которую нужно сравнивает со всеми сторонами плитки tile2.
-    Из 4 сторон выбирает ту с которой коэфф. соответствия меньше и
-    return =>> np.array [коэфф.соответствия(min), номер плитки(tile2.number), номер стороны плитки(tile2.side)]"""
-    similarity = np.zeros((3,4))
-    count = 0
-    for s2 in tile2.sides:
-        s_1 = tile1.sides[side_tile_1]
-        s_2 = tile2.sides[s2]
-        s_2 = s_2[::-1]
-        sim = s_1 - s_2
-        similarity[0,count]=np.std(sim)
-        similarity[1,count]=tile2.number
-        similarity[2,count]=s2
-        count +=1
-    i,j = np.where(similarity == min(similarity[0,:]))
-    answer = similarity[:,j].flatten()
-    return answer
+    def check_similarity(self, tile1, side_tile_1, tile2):
+        """Получает на вход плитку tile1 и номер её стороны side_tile_1, которую нужно сравнивает со всеми сторонами плитки tile2.
+        Из 4 сторон выбирает ту с которой коэфф. соответствия меньше и
+        return =>> np.array [коэфф.соответствия(min), номер плитки(tile2.number), номер стороны плитки(tile2.side)]"""
+        similarity = np.zeros((3,4))
+        count = 0
+        for s2 in tile2.sides:
+            s_1 = tile1.sides[side_tile_1]
+            s_2 = tile2.sides[s2]
+            s_2 = s_2[::-1]
+            sim = s_1 - s_2
+            similarity[0,count]=np.mean(np.abs(sim))
+            similarity[1,count]=tile2.number
+            similarity[2,count]=s2
+            count +=1
+        i,j = np.where(similarity == min(similarity[0,:]))
+        if len(j) !=1:      #я без понятия почему, но np.where(similarity == s_min) иногда выдает больше одного ответа(с различными similarity). И если не отсекать лишние появляется ошибка. 
+            j = j[0]
+        answer = similarity[:,j].flatten()
+        return answer
+    
+    def verification(self, pair1, pair2, list_of_tiles): # FIXME упростить вывод функции и написать комментарий
+        """Функция используется для проверки найденных связей. Получает на вход два кортежа, pair1 и pair2, которые характеризуют две плитки, которые связаны с некоторой третьей плиткой, 
+        и проверяет,связаны ли эти плитки с еще одной общей. list_of_tiles список хранящий все плитки.
+        return =>> tuple(номер общей плитки(mutual_tile.number), номер соответствующей pair1 стороны плитки(mutual_tile.side)],номер стороны плитки(side_pair1),
+        номер общей плитки(mutual_tile.number), номер соответствующей pair2 стороны плитки(mutual_tile.side)],номер стороны плитки(side_pair2)) или False если общей плитки найти не удалось.
+        """
+        s_p_1 = int(pair1[1]) #номер стороны которой соответствует pair1
+        s_p_2 = int(pair2[1]) #номер стороны которой соответствует pair2
+
+        ver_side_t1 = 4 if s_p_1 == 1 else s_p_1 - 1
+        ver_side_t2 = 1 if s_p_2 == 4 else s_p_2 + 1
+        v1 = self.find_similar_tile(list_of_tiles[int(pair1[0])],ver_side_t1,list_of_tiles)
+        v2 = self.find_similar_tile(list_of_tiles[int(pair2[0])],ver_side_t2,list_of_tiles)
+        if v1[0]==v2[0]:
+            return (int(v1[0]), int(v1[1]), s_p_1, int(v2[0]), int(v2[1]), s_p_2)
+        else:
+            return False
+    
+    def rotate(self, tile, number_of_rotate):
+        """Берет на вход плитку и целое число, означающее количество применений np.rot90() на эту плитку"""
+        tile.body = np.rot90(tile.body, number_of_rotate)
+        tile.smooth_body = np.rot90(tile.smooth_body,number_of_rotate)
+        tile.sliser()
+        tile.flag = True
+
+    def find_number_the_tile_in_the_pickture(self,tile,list_of_tiles):
+        if tile.flag==False:
+            print('flag false')
+        tile_for_side_1 = self.find_similar_tile(tile, 1, list_of_tiles)
+        tile_for_side_2 = self.find_similar_tile(tile, 2, list_of_tiles)
+        tile_for_side_3 = self.find_similar_tile(tile, 3, list_of_tiles)
+        tile_for_side_4 = self.find_similar_tile(tile, 4, list_of_tiles)
+
+        result1 = self.verification(tile_for_side_1,tile_for_side_2, list_of_tiles)
+        result2 = self.verification(tile_for_side_2,tile_for_side_3, list_of_tiles)
+        result3 = self.verification(tile_for_side_3,tile_for_side_4, list_of_tiles)
+        result4 = self.verification(tile_for_side_4,tile_for_side_1, list_of_tiles)
+        """
+        print("in process")
+        print(tile_for_side_1[0])
+        print(result1)
+        print(result2)
+        print(result3)
+        print(result4)
+        """
+        if (result1 or result4) and list_of_tiles[tile_for_side_1[0]].flag == False:
+            self.rotate(list_of_tiles[tile_for_side_1[0]], calculate_number_of_rotate(1, tile_for_side_1[1]))
+            list_of_tiles[tile_for_side_1[0]].position_in_the_picture = tile.position_in_the_picture + 1
+            pass
+          #  self.find_number_the_tile_in_the_pickture(list_of_tiles[tile_for_side_1[0]],list_of_tiles)
+
+        elif (result1 or result2) and list_of_tiles[tile_for_side_2[0]].flag == False:
+            self.rotate(list_of_tiles[tile_for_side_2[0]], calculate_number_of_rotate(2, tile_for_side_2[1]))
+            list_of_tiles[tile_for_side_2[0]].position_in_the_picture = tile.position_in_the_picture - tile.coefficient_for_find_number_of_the_tile * tile.multiplier
+            pass  
+          #  self.find_number_the_tile_in_the_pickture(list_of_tiles[tile_for_side_2[0]],list_of_tiles)
+
+        elif (result2 or result3) and list_of_tiles[tile_for_side_3[0]].flag == False:
+            self.rotate(list_of_tiles[tile_for_side_3[0]],calculate_number_of_rotate(3, tile_for_side_3[1]))
+            list_of_tiles[tile_for_side_3[0]].position_in_the_picture = tile.position_in_the_picture - 1
+            pass
+          #  self.find_number_the_tile_in_the_pickture(list_of_tiles[tile_for_side_3[0]],list_of_tiles)
+
+        elif (result3 or result4) and list_of_tiles[tile_for_side_4[0]].flag == False:
+            self.rotate(list_of_tiles[tile_for_side_4[0]],calculate_number_of_rotate(4, tile_for_side_4[1]))
+            list_of_tiles[tile_for_side_4[0]].position_in_the_picture = tile.position_in_the_picture + tile.coefficient_for_find_number_of_the_tile * tile.multiplier
+            pass
+        #  self.find_number_the_tile_in_the_pickture(list_of_tiles[tile_for_side_4[0]],list_of_tiles)
+
+        else:
+            print("done!")
+
+
+
 
 def print_image():
     for i in range(len(list_of_tiles)):
@@ -121,14 +197,26 @@ def solve():
         tile.smooth(NUMBER_OF_SMOOTHING)
         tile.sliser()
         list_of_tiles.append(tile)
-        
-    fill_sides_matching_to_the_sides(list_of_tiles)
-    for ti in list_of_tiles:
-        print(ti.sides_matching_to_the_sides)
-    for ti in list_of_tiles:
-        print(ti.rating_of_match)    
-    #print_image()
+    Tile.coefficient_for_find_number_of_the_tile = (len(list_of_tiles)/12)**0.5
+    assembler = Assembler(list_of_tiles)
+    first_tile = list_of_tiles[0]
+    assembler.rotate(first_tile,1)
+    assembler.find_number_the_tile_in_the_pickture(first_tile,list_of_tiles)
 
+    for instance in list_of_tiles:
+        if instance.flag == True:
+            assembler.find_number_the_tile_in_the_pickture(instance,list_of_tiles) 
+    for instance in list_of_tiles:
+        if instance.flag == True:
+            assembler.find_number_the_tile_in_the_pickture(instance,list_of_tiles) 
+    flags = []
+    positions = []
+    for ex in list_of_tiles:
+        positions.append(ex.position_in_the_picture)
+        flags.append(ex.flag)
+    print(positions)
+    print(flags)
 
+    
 if __name__ == "__main__":
     solve()
